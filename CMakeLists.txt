@@ -12,14 +12,16 @@ if (DEFINED tinyxml2_SHARED_LIBS)
     set(BUILD_SHARED_LIBS "${tinyxml2_SHARED_LIBS}")
 endif ()
 
-##
-## Main library build
-##
 
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
-add_library(tinyxml2 tinyxml2.cpp tinyxml2.h)
+add_library(tinyxml2
+        tinyxml2.cpp
+        tinyxml2.h
+        src/StrPair.cpp src/StrPair.h
+        src/XMLUtil.cpp src/XMLUtil.h
+        )
 add_library(tinyxml2::tinyxml2 ALIAS tinyxml2)
 
 # Uncomment the following line to require C++11 (or greater) to use tinyxml2
@@ -31,6 +33,7 @@ target_compile_definitions(
     PUBLIC $<$<CONFIG:Debug>:TINYXML2_DEBUG>
     INTERFACE $<$<BOOL:${BUILD_SHARED_LIBS}>:TINYXML2_IMPORT>
     PRIVATE $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
+
 )
 
 set_target_properties(
@@ -41,7 +44,9 @@ set_target_properties(
     SOVERSION "${tinyxml2_VERSION_MAJOR}"
 )
 
-if (tinyxml2_BUILD_TESTING)
+
+
+if (tinyxml2_BUILD_TESTING)     
     add_executable(xmltest xmltest.cpp)
     target_link_libraries(xmltest PRIVATE tinyxml2::tinyxml2)
 
@@ -52,6 +57,9 @@ if (tinyxml2_BUILD_TESTING)
     )
 
     set_tests_properties(xmltest PROPERTIES PASS_REGULAR_EXPRESSION ", Fail 0")
+
+    add_subdirectory(test)
+
 endif ()
 
 ##
