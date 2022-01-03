@@ -41,6 +41,9 @@ distribution.
 #   include <cstring>
 #endif
 #include <stdint.h>
+#include "src/DynArray.h"
+#include "src/MemPoolT.h"
+#include "src/XMLUtil.h"
 
 /*
    TODO: intern strings instead of allocation.
@@ -197,265 +200,265 @@ private:
 };
 
 
-/*
-	A dynamic array of Plain Old Data. Doesn't support constructors, etc.
-	Has a small initial memory pool, so that low or no usage will not
-	cause a call to new/delete
-*/
-template <class T, int INITIAL_SIZE>
-class DynArray
-{
-public:
-    DynArray() :
-        _mem( _pool ),
-        _allocated( INITIAL_SIZE ),
-        _size( 0 )
-    {
-    }
+///*
+//	A dynamic array of Plain Old Data. Doesn't support constructors, etc.
+//	Has a small initial memory pool, so that low or no usage will not
+//	cause a call to new/delete
+//*/
+//template <class T, int INITIAL_SIZE>
+//class DynArray
+//{
+//public:
+//    DynArray() :
+//        _mem( _pool ),
+//        _allocated( INITIAL_SIZE ),
+//        _size( 0 )
+//    {
+//    }
 
-    ~DynArray() {
-        if ( _mem != _pool ) {
-            delete [] _mem;
-        }
-    }
+//    ~DynArray() {
+//        if ( _mem != _pool ) {
+//            delete [] _mem;
+//        }
+//    }
 
-    void Clear() {
-        _size = 0;
-    }
+//    void Clear() {
+//        _size = 0;
+//    }
 
-    void Push( T t ) {
-        TIXMLASSERT( _size < INT_MAX );
-        EnsureCapacity( _size+1 );
-        _mem[_size] = t;
-        ++_size;
-    }
+//    void Push( T t ) {
+//        TIXMLASSERT( _size < INT_MAX );
+//        EnsureCapacity( _size+1 );
+//        _mem[_size] = t;
+//        ++_size;
+//    }
 
-    T* PushArr( int count ) {
-        TIXMLASSERT( count >= 0 );
-        TIXMLASSERT( _size <= INT_MAX - count );
-        EnsureCapacity( _size+count );
-        T* ret = &_mem[_size];
-        _size += count;
-        return ret;
-    }
+//    T* PushArr( int count ) {
+//        TIXMLASSERT( count >= 0 );
+//        TIXMLASSERT( _size <= INT_MAX - count );
+//        EnsureCapacity( _size+count );
+//        T* ret = &_mem[_size];
+//        _size += count;
+//        return ret;
+//    }
 
-    T Pop() {
-        TIXMLASSERT( _size > 0 );
-        --_size;
-        return _mem[_size];
-    }
+//    T Pop() {
+//        TIXMLASSERT( _size > 0 );
+//        --_size;
+//        return _mem[_size];
+//    }
 
-    void PopArr( int count ) {
-        TIXMLASSERT( _size >= count );
-        _size -= count;
-    }
+//    void PopArr( int count ) {
+//        TIXMLASSERT( _size >= count );
+//        _size -= count;
+//    }
 
-    bool Empty() const					{
-        return _size == 0;
-    }
+//    bool Empty() const					{
+//        return _size == 0;
+//    }
 
-    T& operator[](int i)				{
-        TIXMLASSERT( i>= 0 && i < _size );
-        return _mem[i];
-    }
+//    T& operator[](int i)				{
+//        TIXMLASSERT( i>= 0 && i < _size );
+//        return _mem[i];
+//    }
 
-    const T& operator[](int i) const	{
-        TIXMLASSERT( i>= 0 && i < _size );
-        return _mem[i];
-    }
+//    const T& operator[](int i) const	{
+//        TIXMLASSERT( i>= 0 && i < _size );
+//        return _mem[i];
+//    }
 
-    const T& PeekTop() const            {
-        TIXMLASSERT( _size > 0 );
-        return _mem[ _size - 1];
-    }
+//    const T& PeekTop() const            {
+//        TIXMLASSERT( _size > 0 );
+//        return _mem[ _size - 1];
+//    }
 
-    int Size() const					{
-        TIXMLASSERT( _size >= 0 );
-        return _size;
-    }
+//    int Size() const					{
+//        TIXMLASSERT( _size >= 0 );
+//        return _size;
+//    }
 
-    int Capacity() const				{
-        TIXMLASSERT( _allocated >= INITIAL_SIZE );
-        return _allocated;
-    }
+//    int Capacity() const				{
+//        TIXMLASSERT( _allocated >= INITIAL_SIZE );
+//        return _allocated;
+//    }
 
-	void SwapRemove(int i) {
-		TIXMLASSERT(i >= 0 && i < _size);
-		TIXMLASSERT(_size > 0);
-		_mem[i] = _mem[_size - 1];
-		--_size;
-	}
+//	void SwapRemove(int i) {
+//		TIXMLASSERT(i >= 0 && i < _size);
+//		TIXMLASSERT(_size > 0);
+//		_mem[i] = _mem[_size - 1];
+//		--_size;
+//	}
 
-    const T* Mem() const				{
-        TIXMLASSERT( _mem );
-        return _mem;
-    }
+//    const T* Mem() const				{
+//        TIXMLASSERT( _mem );
+//        return _mem;
+//    }
 
-    T* Mem() {
-        TIXMLASSERT( _mem );
-        return _mem;
-    }
+//    T* Mem() {
+//        TIXMLASSERT( _mem );
+//        return _mem;
+//    }
 
-private:
-    DynArray( const DynArray& ); // not supported
-    void operator=( const DynArray& ); // not supported
+//private:
+//    DynArray( const DynArray& ); // not supported
+//    void operator=( const DynArray& ); // not supported
 
-    void EnsureCapacity( int cap ) {
-        TIXMLASSERT( cap > 0 );
-        if ( cap > _allocated ) {
-            TIXMLASSERT( cap <= INT_MAX / 2 );
-            const int newAllocated = cap * 2;
-            T* newMem = new T[newAllocated];
-            TIXMLASSERT( newAllocated >= _size );
-            memcpy( newMem, _mem, sizeof(T)*_size );	// warning: not using constructors, only works for PODs
-            if ( _mem != _pool ) {
-                delete [] _mem;
-            }
-            _mem = newMem;
-            _allocated = newAllocated;
-        }
-    }
+//    void EnsureCapacity( int cap ) {
+//        TIXMLASSERT( cap > 0 );
+//        if ( cap > _allocated ) {
+//            TIXMLASSERT( cap <= INT_MAX / 2 );
+//            const int newAllocated = cap * 2;
+//            T* newMem = new T[newAllocated];
+//            TIXMLASSERT( newAllocated >= _size );
+//            memcpy( newMem, _mem, sizeof(T)*_size );	// warning: not using constructors, only works for PODs
+//            if ( _mem != _pool ) {
+//                delete [] _mem;
+//            }
+//            _mem = newMem;
+//            _allocated = newAllocated;
+//        }
+//    }
 
-    T*  _mem;
-    T   _pool[INITIAL_SIZE];
-    int _allocated;		// objects allocated
-    int _size;			// number objects in use
-};
+//    T*  _mem;
+//    T   _pool[INITIAL_SIZE];
+//    int _allocated;		// objects allocated
+//    int _size;			// number objects in use
+//};
 
 
 /*
 	Parent virtual class of a pool for fast allocation
 	and deallocation of objects.
 */
-class MemPool
-{
-public:
-    MemPool() {}
-    virtual ~MemPool() {}
+//class MemPool
+//{
+//public:
+//    MemPool() {}
+//    virtual ~MemPool() {}
 
-    virtual int ItemSize() const = 0;
-    virtual void* Alloc() = 0;
-    virtual void Free( void* ) = 0;
-    virtual void SetTracked() = 0;
-};
+//    virtual int ItemSize() const = 0;
+//    virtual void* Alloc() = 0;
+//    virtual void Free( void* ) = 0;
+//    virtual void SetTracked() = 0;
+//};
 
 
 /*
 	Template child class to create pools of the correct type.
 */
-template< int ITEM_SIZE >
-class MemPoolT : public MemPool
-{
-public:
-    MemPoolT() : _blockPtrs(), _root(0), _currentAllocs(0), _nAllocs(0), _maxAllocs(0), _nUntracked(0)	{}
-    ~MemPoolT() {
-        MemPoolT< ITEM_SIZE >::Clear();
-    }
+//template< int ITEM_SIZE >
+//class MemPoolT : public MemPool
+//{
+//public:
+//    MemPoolT() : _blockPtrs(), _root(0), _currentAllocs(0), _nAllocs(0), _maxAllocs(0), _nUntracked(0)	{}
+//    ~MemPoolT() {
+//        MemPoolT< ITEM_SIZE >::Clear();
+//    }
 
-    void Clear() {
-        // Delete the blocks.
-        while( !_blockPtrs.Empty()) {
-            Block* lastBlock = _blockPtrs.Pop();
-            delete lastBlock;
-        }
-        _root = 0;
-        _currentAllocs = 0;
-        _nAllocs = 0;
-        _maxAllocs = 0;
-        _nUntracked = 0;
-    }
+//    void Clear() {
+//        // Delete the blocks.
+//        while( !_blockPtrs.Empty()) {
+//            Block* lastBlock = _blockPtrs.Pop();
+//            delete lastBlock;
+//        }
+//        _root = 0;
+//        _currentAllocs = 0;
+//        _nAllocs = 0;
+//        _maxAllocs = 0;
+//        _nUntracked = 0;
+//    }
 
-    virtual int ItemSize() const	{
-        return ITEM_SIZE;
-    }
-    int CurrentAllocs() const		{
-        return _currentAllocs;
-    }
+//    virtual int ItemSize() const	{
+//        return ITEM_SIZE;
+//    }
+//    int CurrentAllocs() const		{
+//        return _currentAllocs;
+//    }
 
-    virtual void* Alloc() {
-        if ( !_root ) {
-            // Need a new block.
-            Block* block = new Block();
-            _blockPtrs.Push( block );
+//    virtual void* Alloc() {
+//        if ( !_root ) {
+//            // Need a new block.
+//            Block* block = new Block();
+//            _blockPtrs.Push( block );
 
-            Item* blockItems = block->items;
-            for( int i = 0; i < ITEMS_PER_BLOCK - 1; ++i ) {
-                blockItems[i].next = &(blockItems[i + 1]);
-            }
-            blockItems[ITEMS_PER_BLOCK - 1].next = 0;
-            _root = blockItems;
-        }
-        Item* const result = _root;
-        TIXMLASSERT( result != 0 );
-        _root = _root->next;
+//            Item* blockItems = block->items;
+//            for( int i = 0; i < ITEMS_PER_BLOCK - 1; ++i ) {
+//                blockItems[i].next = &(blockItems[i + 1]);
+//            }
+//            blockItems[ITEMS_PER_BLOCK - 1].next = 0;
+//            _root = blockItems;
+//        }
+//        Item* const result = _root;
+//        TIXMLASSERT( result != 0 );
+//        _root = _root->next;
 
-        ++_currentAllocs;
-        if ( _currentAllocs > _maxAllocs ) {
-            _maxAllocs = _currentAllocs;
-        }
-        ++_nAllocs;
-        ++_nUntracked;
-        return result;
-    }
+//        ++_currentAllocs;
+//        if ( _currentAllocs > _maxAllocs ) {
+//            _maxAllocs = _currentAllocs;
+//        }
+//        ++_nAllocs;
+//        ++_nUntracked;
+//        return result;
+//    }
 
-    virtual void Free( void* mem ) {
-        if ( !mem ) {
-            return;
-        }
-        --_currentAllocs;
-        Item* item = static_cast<Item*>( mem );
-#ifdef TINYXML2_DEBUG
-        memset( item, 0xfe, sizeof( *item ) );
-#endif
-        item->next = _root;
-        _root = item;
-    }
-    void Trace( const char* name ) {
-        printf( "Mempool %s watermark=%d [%dk] current=%d size=%d nAlloc=%d blocks=%d\n",
-                name, _maxAllocs, _maxAllocs * ITEM_SIZE / 1024, _currentAllocs,
-                ITEM_SIZE, _nAllocs, _blockPtrs.Size() );
-    }
+//    virtual void Free( void* mem ) {
+//        if ( !mem ) {
+//            return;
+//        }
+//        --_currentAllocs;
+//        Item* item = static_cast<Item*>( mem );
+//#ifdef TINYXML2_DEBUG
+//        memset( item, 0xfe, sizeof( *item ) );
+//#endif
+//        item->next = _root;
+//        _root = item;
+//    }
+//    void Trace( const char* name ) {
+//        printf( "Mempool %s watermark=%d [%dk] current=%d size=%d nAlloc=%d blocks=%d\n",
+//                name, _maxAllocs, _maxAllocs * ITEM_SIZE / 1024, _currentAllocs,
+//                ITEM_SIZE, _nAllocs, _blockPtrs.Size() );
+//    }
 
-    void SetTracked() {
-        --_nUntracked;
-    }
+//    void SetTracked() {
+//        --_nUntracked;
+//    }
 
-    int Untracked() const {
-        return _nUntracked;
-    }
+//    int Untracked() const {
+//        return _nUntracked;
+//    }
 
-	// This number is perf sensitive. 4k seems like a good tradeoff on my machine.
-	// The test file is large, 170k.
-	// Release:		VS2010 gcc(no opt)
-	//		1k:		4000
-	//		2k:		4000
-	//		4k:		3900	21000
-	//		16k:	5200
-	//		32k:	4300
-	//		64k:	4000	21000
-    // Declared public because some compilers do not accept to use ITEMS_PER_BLOCK
-    // in private part if ITEMS_PER_BLOCK is private
-    enum { ITEMS_PER_BLOCK = (4 * 1024) / ITEM_SIZE };
+//	// This number is perf sensitive. 4k seems like a good tradeoff on my machine.
+//	// The test file is large, 170k.
+//	// Release:		VS2010 gcc(no opt)
+//	//		1k:		4000
+//	//		2k:		4000
+//	//		4k:		3900	21000
+//	//		16k:	5200
+//	//		32k:	4300
+//	//		64k:	4000	21000
+//    // Declared public because some compilers do not accept to use ITEMS_PER_BLOCK
+//    // in private part if ITEMS_PER_BLOCK is private
+//    enum { ITEMS_PER_BLOCK = (4 * 1024) / ITEM_SIZE };
 
-private:
-    MemPoolT( const MemPoolT& ); // not supported
-    void operator=( const MemPoolT& ); // not supported
+//private:
+//    MemPoolT( const MemPoolT& ); // not supported
+//    void operator=( const MemPoolT& ); // not supported
 
-    union Item {
-        Item*   next;
-        char    itemData[ITEM_SIZE];
-    };
-    struct Block {
-        Item items[ITEMS_PER_BLOCK];
-    };
-    DynArray< Block*, 10 > _blockPtrs;
-    Item* _root;
+//    union Item {
+//        Item*   next;
+//        char    itemData[ITEM_SIZE];
+//    };
+//    struct Block {
+//        Item items[ITEMS_PER_BLOCK];
+//    };
+//    DynArray< Block*, 10 > _blockPtrs;
+//    Item* _root;
 
-    int _currentAllocs;
-    int _nAllocs;
-    int _maxAllocs;
-    int _nUntracked;
-};
+//    int _currentAllocs;
+//    int _nAllocs;
+//    int _maxAllocs;
+//    int _nUntracked;
+//};
 
 
 
@@ -545,105 +548,105 @@ enum XMLError {
 };
 
 
-/*
-	Utility functionality.
-*/
-class TINYXML2_LIB XMLUtil
-{
-public:
-    static const char* SkipWhiteSpace( const char* p, int* curLineNumPtr )	{
-        TIXMLASSERT( p );
+///*
+//	Utility functionality.
+//*/
+//class TINYXML2_LIB XMLUtil
+//{
+//public:
+//    static const char* SkipWhiteSpace( const char* p, int* curLineNumPtr )	{
+//        TIXMLASSERT( p );
 
-        while( IsWhiteSpace(*p) ) {
-            if (curLineNumPtr && *p == '\n') {
-                ++(*curLineNumPtr);
-            }
-            ++p;
-        }
-        TIXMLASSERT( p );
-        return p;
-    }
-    static char* SkipWhiteSpace( char* const p, int* curLineNumPtr ) {
-        return const_cast<char*>( SkipWhiteSpace( const_cast<const char*>(p), curLineNumPtr ) );
-    }
+//        while( IsWhiteSpace(*p) ) {
+//            if (curLineNumPtr && *p == '\n') {
+//                ++(*curLineNumPtr);
+//            }
+//            ++p;
+//        }
+//        TIXMLASSERT( p );
+//        return p;
+//    }
+//    static char* SkipWhiteSpace( char* const p, int* curLineNumPtr ) {
+//        return const_cast<char*>( SkipWhiteSpace( const_cast<const char*>(p), curLineNumPtr ) );
+//    }
 
-    // Anything in the high order range of UTF-8 is assumed to not be whitespace. This isn't
-    // correct, but simple, and usually works.
-    static bool IsWhiteSpace( char p )					{
-        return !IsUTF8Continuation(p) && isspace( static_cast<unsigned char>(p) );
-    }
+//    // Anything in the high order range of UTF-8 is assumed to not be whitespace. This isn't
+//    // correct, but simple, and usually works.
+//    static bool IsWhiteSpace( char p )					{
+//        return !IsUTF8Continuation(p) && isspace( static_cast<unsigned char>(p) );
+//    }
 
-    inline static bool IsNameStartChar( unsigned char ch ) {
-        if ( ch >= 128 ) {
-            // This is a heuristic guess in attempt to not implement Unicode-aware isalpha()
-            return true;
-        }
-        if ( isalpha( ch ) ) {
-            return true;
-        }
-        return ch == ':' || ch == '_';
-    }
+//    inline static bool IsNameStartChar( unsigned char ch ) {
+//        if ( ch >= 128 ) {
+//            // This is a heuristic guess in attempt to not implement Unicode-aware isalpha()
+//            return true;
+//        }
+//        if ( isalpha( ch ) ) {
+//            return true;
+//        }
+//        return ch == ':' || ch == '_';
+//    }
 
-    inline static bool IsNameChar( unsigned char ch ) {
-        return IsNameStartChar( ch )
-               || isdigit( ch )
-               || ch == '.'
-               || ch == '-';
-    }
+//    inline static bool IsNameChar( unsigned char ch ) {
+//        return IsNameStartChar( ch )
+//               || isdigit( ch )
+//               || ch == '.'
+//               || ch == '-';
+//    }
 
-    inline static bool IsPrefixHex( const char* p) {
-        p = SkipWhiteSpace(p, 0);
-        return p && *p == '0' && ( *(p + 1) == 'x' || *(p + 1) == 'X');
-    }
+//    inline static bool IsPrefixHex( const char* p) {
+//        p = SkipWhiteSpace(p, 0);
+//        return p && *p == '0' && ( *(p + 1) == 'x' || *(p + 1) == 'X');
+//    }
 
-    inline static bool StringEqual( const char* p, const char* q, int nChar=INT_MAX )  {
-        if ( p == q ) {
-            return true;
-        }
-        TIXMLASSERT( p );
-        TIXMLASSERT( q );
-        TIXMLASSERT( nChar >= 0 );
-        return strncmp( p, q, nChar ) == 0;
-    }
+//    inline static bool StringEqual( const char* p, const char* q, int nChar=INT_MAX )  {
+//        if ( p == q ) {
+//            return true;
+//        }
+//        TIXMLASSERT( p );
+//        TIXMLASSERT( q );
+//        TIXMLASSERT( nChar >= 0 );
+//        return strncmp( p, q, nChar ) == 0;
+//    }
 
-    inline static bool IsUTF8Continuation( const char p ) {
-        return ( p & 0x80 ) != 0;
-    }
+//    inline static bool IsUTF8Continuation( const char p ) {
+//        return ( p & 0x80 ) != 0;
+//    }
 
-    static const char* ReadBOM( const char* p, bool* hasBOM );
-    // p is the starting location,
-    // the UTF-8 value of the entity will be placed in value, and length filled in.
-    static const char* GetCharacterRef( const char* p, char* value, int* length );
-    static void ConvertUTF32ToUTF8( unsigned long input, char* output, int* length );
+//    static const char* ReadBOM( const char* p, bool* hasBOM );
+//    // p is the starting location,
+//    // the UTF-8 value of the entity will be placed in value, and length filled in.
+//    static const char* GetCharacterRef( const char* p, char* value, int* length );
+//    static void ConvertUTF32ToUTF8( unsigned long input, char* output, int* length );
 
-    // converts primitive types to strings
-    static void ToStr( int v, char* buffer, int bufferSize );
-    static void ToStr( unsigned v, char* buffer, int bufferSize );
-    static void ToStr( bool v, char* buffer, int bufferSize );
-    static void ToStr( float v, char* buffer, int bufferSize );
-    static void ToStr( double v, char* buffer, int bufferSize );
-	static void ToStr(int64_t v, char* buffer, int bufferSize);
-    static void ToStr(uint64_t v, char* buffer, int bufferSize);
+//    // converts primitive types to strings
+//    static void ToStr( int v, char* buffer, int bufferSize );
+//    static void ToStr( unsigned v, char* buffer, int bufferSize );
+//    static void ToStr( bool v, char* buffer, int bufferSize );
+//    static void ToStr( float v, char* buffer, int bufferSize );
+//    static void ToStr( double v, char* buffer, int bufferSize );
+//	static void ToStr(int64_t v, char* buffer, int bufferSize);
+//    static void ToStr(uint64_t v, char* buffer, int bufferSize);
 
-    // converts strings to primitive types
-    static bool	ToInt( const char* str, int* value );
-    static bool ToUnsigned( const char* str, unsigned* value );
-    static bool	ToBool( const char* str, bool* value );
-    static bool	ToFloat( const char* str, float* value );
-    static bool ToDouble( const char* str, double* value );
-	static bool ToInt64(const char* str, int64_t* value);
-    static bool ToUnsigned64(const char* str, uint64_t* value);
-	// Changes what is serialized for a boolean value.
-	// Default to "true" and "false". Shouldn't be changed
-	// unless you have a special testing or compatibility need.
-	// Be careful: static, global, & not thread safe.
-	// Be sure to set static const memory as parameters.
-	static void SetBoolSerialization(const char* writeTrue, const char* writeFalse);
+//    // converts strings to primitive types
+//    static bool	ToInt( const char* str, int* value );
+//    static bool ToUnsigned( const char* str, unsigned* value );
+//    static bool	ToBool( const char* str, bool* value );
+//    static bool	ToFloat( const char* str, float* value );
+//    static bool ToDouble( const char* str, double* value );
+//	static bool ToInt64(const char* str, int64_t* value);
+//    static bool ToUnsigned64(const char* str, uint64_t* value);
+//	// Changes what is serialized for a boolean value.
+//	// Default to "true" and "false". Shouldn't be changed
+//	// unless you have a special testing or compatibility need.
+//	// Be careful: static, global, & not thread safe.
+//	// Be sure to set static const memory as parameters.
+//	static void SetBoolSerialization(const char* writeTrue, const char* writeFalse);
 
-private:
-	static const char* writeBoolTrue;
-	static const char* writeBoolFalse;
-};
+//private:
+//	static const char* writeBoolTrue;
+//	static const char* writeBoolFalse;
+//};
 
 
 /** XMLNode is a base class for every object that is in the
@@ -1709,9 +1712,9 @@ enum Whitespace {
 
 
 /** A Document binds together all the functionality.
-	It can be saved, loaded, and printed to the screen.
-	All Nodes are connected and allocated to a Document.
-	If the Document is deleted, all its Nodes are also deleted.
+    It can be saved, loaded, and printed to the screen.
+    All Nodes are connected and allocated to a Document.
+    If the Document is deleted, all its Nodes are also deleted.
 */
 class TINYXML2_LIB XMLDocument : public XMLNode
 {
@@ -1738,50 +1741,50 @@ public:
     }
 
     /**
-    	Parse an XML file from a character string.
-    	Returns XML_SUCCESS (0) on success, or
-    	an errorID.
+        Parse an XML file from a character string.
+        Returns XML_SUCCESS (0) on success, or
+        an errorID.
 
-    	You may optionally pass in the 'nBytes', which is
-    	the number of bytes which will be parsed. If not
-    	specified, TinyXML-2 will assume 'xml' points to a
-    	null terminated string.
+        You may optionally pass in the 'nBytes', which is
+        the number of bytes which will be parsed. If not
+        specified, TinyXML-2 will assume 'xml' points to a
+        null terminated string.
     */
     XMLError Parse( const char* xml, size_t nBytes=static_cast<size_t>(-1) );
 
     /**
-    	Load an XML file from disk.
-    	Returns XML_SUCCESS (0) on success, or
-    	an errorID.
+        Load an XML file from disk.
+        Returns XML_SUCCESS (0) on success, or
+        an errorID.
     */
     XMLError LoadFile( const char* filename );
 
     /**
-    	Load an XML file from disk. You are responsible
-    	for providing and closing the FILE*.
+        Load an XML file from disk. You are responsible
+        for providing and closing the FILE*.
 
         NOTE: The file should be opened as binary ("rb")
         not text in order for TinyXML-2 to correctly
         do newline normalization.
 
-    	Returns XML_SUCCESS (0) on success, or
-    	an errorID.
+        Returns XML_SUCCESS (0) on success, or
+        an errorID.
     */
     XMLError LoadFile( FILE* );
 
     /**
-    	Save the XML file to disk.
-    	Returns XML_SUCCESS (0) on success, or
-    	an errorID.
+        Save the XML file to disk.
+        Returns XML_SUCCESS (0) on success, or
+        an errorID.
     */
     XMLError SaveFile( const char* filename, bool compact = false );
 
     /**
-    	Save the XML file to disk. You are responsible
-    	for providing and closing the FILE*.
+        Save the XML file to disk. You are responsible
+        for providing and closing the FILE*.
 
-    	Returns XML_SUCCESS (0) on success, or
-    	an errorID.
+        Returns XML_SUCCESS (0) on success, or
+        an errorID.
     */
     XMLError SaveFile( FILE* fp, bool compact = false );
 
@@ -1793,7 +1796,7 @@ public:
     }
 
     /**
-    	Returns true if this document has a leading Byte Order Mark of UTF8.
+        Returns true if this document has a leading Byte Order Mark of UTF8.
     */
     bool HasBOM() const {
         return _writeBOM;
@@ -1816,61 +1819,61 @@ public:
 
     /** Print the Document. If the Printer is not provided, it will
         print to stdout. If you provide Printer, this can print to a file:
-    	@verbatim
-    	XMLPrinter printer( fp );
-    	doc.Print( &printer );
-    	@endverbatim
+        @verbatim
+        XMLPrinter printer( fp );
+        doc.Print( &printer );
+        @endverbatim
 
-    	Or you can use a printer to print to memory:
-    	@verbatim
-    	XMLPrinter printer;
-    	doc.Print( &printer );
-    	// printer.CStr() has a const char* to the XML
-    	@endverbatim
+        Or you can use a printer to print to memory:
+        @verbatim
+        XMLPrinter printer;
+        doc.Print( &printer );
+        // printer.CStr() has a const char* to the XML
+        @endverbatim
     */
     void Print( XMLPrinter* streamer=0 ) const;
     virtual bool Accept( XMLVisitor* visitor ) const;
 
     /**
-    	Create a new Element associated with
-    	this Document. The memory for the Element
-    	is managed by the Document.
+        Create a new Element associated with
+        this Document. The memory for the Element
+        is managed by the Document.
     */
     XMLElement* NewElement( const char* name );
     /**
-    	Create a new Comment associated with
-    	this Document. The memory for the Comment
-    	is managed by the Document.
+        Create a new Comment associated with
+        this Document. The memory for the Comment
+        is managed by the Document.
     */
     XMLComment* NewComment( const char* comment );
     /**
-    	Create a new Text associated with
-    	this Document. The memory for the Text
-    	is managed by the Document.
+        Create a new Text associated with
+        this Document. The memory for the Text
+        is managed by the Document.
     */
     XMLText* NewText( const char* text );
     /**
-    	Create a new Declaration associated with
-    	this Document. The memory for the object
-    	is managed by the Document.
+        Create a new Declaration associated with
+        this Document. The memory for the object
+        is managed by the Document.
 
-    	If the 'text' param is null, the standard
-    	declaration is used.:
-    	@verbatim
-    		<?xml version="1.0" encoding="UTF-8"?>
-    	@endverbatim
+        If the 'text' param is null, the standard
+        declaration is used.:
+        @verbatim
+            <?xml version="1.0" encoding="UTF-8"?>
+        @endverbatim
     */
     XMLDeclaration* NewDeclaration( const char* text=0 );
     /**
-    	Create a new Unknown associated with
-    	this Document. The memory for the object
-    	is managed by the Document.
+        Create a new Unknown associated with
+        this Document. The memory for the object
+        is managed by the Document.
     */
     XMLUnknown* NewUnknown( const char* text );
 
     /**
-    	Delete a node associated with this document.
-    	It will be unlinked from the DOM.
+        Delete a node associated with this document.
+        It will be unlinked from the DOM.
     */
     void DeleteNode( XMLNode* node );
 
@@ -1885,13 +1888,13 @@ public:
     XMLError  ErrorID() const {
         return _errorID;
     }
-	const char* ErrorName() const;
+    const char* ErrorName() const;
     static const char* ErrorIDToName(XMLError errorID);
 
     /** Returns a "long form" error description. A hopefully helpful
         diagnostic with location, line number, and/or additional info.
     */
-	const char* ErrorStr() const;
+    const char* ErrorStr() const;
 
     /// A (trivial) utility function that prints the ErrorStr() to stdout.
     void PrintError() const;
@@ -1905,20 +1908,20 @@ public:
     /// Clear the document, resetting it to the initial state.
     void Clear();
 
-	/**
-		Copies this document to a target document.
-		The target will be completely cleared before the copy.
-		If you want to copy a sub-tree, see XMLNode::DeepClone().
+    /**
+        Copies this document to a target document.
+        The target will be completely cleared before the copy.
+        If you want to copy a sub-tree, see XMLNode::DeepClone().
 
-		NOTE: that the 'target' must be non-null.
-	*/
-	void DeepCopy(XMLDocument* target) const;
+        NOTE: that the 'target' must be non-null.
+    */
+    void DeepCopy(XMLDocument* target) const;
 
-	// internal
+    // internal
     char* Identify( char* p, XMLNode** node );
 
-	// internal
-	void MarkInUse(const XMLNode* const);
+    // internal
+    void MarkInUse(const XMLNode* const);
 
     virtual XMLNode* ShallowClone( XMLDocument* /*document*/ ) const	{
         return 0;
@@ -1939,43 +1942,43 @@ private:
     int             _errorLineNum;
     char*			_charBuffer;
     int				_parseCurLineNum;
-	int				_parsingDepth;
-	// Memory tracking does add some overhead.
-	// However, the code assumes that you don't
-	// have a bunch of unlinked nodes around.
-	// Therefore it takes less memory to track
-	// in the document vs. a linked list in the XMLNode,
-	// and the performance is the same.
-	DynArray<XMLNode*, 10> _unlinked;
+    int				_parsingDepth;
+    // Memory tracking does add some overhead.
+    // However, the code assumes that you don't
+    // have a bunch of unlinked nodes around.
+    // Therefore it takes less memory to track
+    // in the document vs. a linked list in the XMLNode,
+    // and the performance is the same.
+    DynArray<XMLNode*, 10> _unlinked;
 
     MemPoolT< sizeof(XMLElement) >	 _elementPool;
     MemPoolT< sizeof(XMLAttribute) > _attributePool;
     MemPoolT< sizeof(XMLText) >		 _textPool;
     MemPoolT< sizeof(XMLComment) >	 _commentPool;
 
-	static const char* _errorNames[XML_ERROR_COUNT];
+    static const char* _errorNames[XML_ERROR_COUNT];
 
     void Parse();
 
     void SetError( XMLError error, int lineNum, const char* format, ... );
 
-	// Something of an obvious security hole, once it was discovered.
-	// Either an ill-formed XML or an excessively deep one can overflow
-	// the stack. Track stack depth, and error out if needed.
-	class DepthTracker {
-	public:
-		explicit DepthTracker(XMLDocument * document) {
-			this->_document = document;
-			document->PushDepth();
-		}
-		~DepthTracker() {
-			_document->PopDepth();
-		}
-	private:
-		XMLDocument * _document;
-	};
-	void PushDepth();
-	void PopDepth();
+    // Something of an obvious security hole, once it was discovered.
+    // Either an ill-formed XML or an excessively deep one can overflow
+    // the stack. Track stack depth, and error out if needed.
+    class DepthTracker {
+    public:
+        explicit DepthTracker(XMLDocument * document) {
+            this->_document = document;
+            document->PushDepth();
+        }
+        ~DepthTracker() {
+            _document->PopDepth();
+        }
+    private:
+        XMLDocument * _document;
+    };
+    void PushDepth();
+    void PopDepth();
 
     template<class NodeType, int PoolElementSize>
     NodeType* CreateUnlinkedNode( MemPoolT<PoolElementSize>& pool );
@@ -1990,7 +1993,7 @@ inline NodeType* XMLDocument::CreateUnlinkedNode( MemPoolT<PoolElementSize>& poo
     TIXMLASSERT( returnNode );
     returnNode->_memPool = &pool;
 
-	_unlinked.Push(returnNode);
+    _unlinked.Push(returnNode);
     return returnNode;
 }
 

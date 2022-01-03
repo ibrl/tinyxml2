@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(tinyxml2tests
         StrPairTest.cpp
+        XMLUtilTest.cpp
+        DynArrayTest.cpp
         ../../tinyxml2.cpp
         ../../tinyxml2.h
         ../../src/StrPair.cpp

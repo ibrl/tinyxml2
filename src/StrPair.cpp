@@ -33,6 +33,11 @@ StrPair::~StrPair()
     Reset();
 }
 
+std::tuple<char*, char*, int> StrPair::GetState() const
+{
+    return std::make_tuple(_start, _end, _flags);
+}
+
 
 void StrPair::TransferTo( StrPair* other )
 {

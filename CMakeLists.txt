@@ -21,6 +21,10 @@ add_library(tinyxml2
         tinyxml2.h
         src/StrPair.cpp src/StrPair.h
         src/XMLUtil.cpp src/XMLUtil.h
+        src/DynArray.h
+        src/MemPoolT.h
+        #src/XmlNode.h src/XmlNode.cpp
+        #src/XMLDocument.h src/XMLDocument.cpp
         )
 add_library(tinyxml2::tinyxml2 ALIAS tinyxml2)
 
@@ -44,7 +48,7 @@ set_target_properties(
     SOVERSION "${tinyxml2_VERSION_MAJOR}"
 )
 
-
+add_subdirectory(examples)
 
 if (tinyxml2_BUILD_TESTING)     
     add_executable(xmltest xmltest.cpp)
